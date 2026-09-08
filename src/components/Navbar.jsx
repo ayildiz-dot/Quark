@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../App'
+import {
+  IconLayoutDashboard, IconClipboardCheck, IconSchool, IconTarget,
+  IconMessages, IconBug, IconBook, IconSettings,
+} from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import NotificationBell from './NotificationBell'
 import ColorPicker, { applyAccent, clearAccent } from './ColorPicker'
@@ -132,37 +136,37 @@ export default function Navbar() {
       <div className="navbar-links">
         <button className={`nav-item ${isActive('/dashboard') ? 'active' : ''}`}
           onClick={() => safeNavigate('/dashboard')}>
-          <i className="ti ti-layout-dashboard" aria-hidden="true" />
+          <IconLayoutDashboard size={18} stroke={1.75} aria-hidden="true" />
           Dashboard
         </button>
         <button className={`nav-item ${isActive('/evaluations') ? 'active' : ''}`}
           onClick={() => safeNavigate('/evaluations')}>
-          <i className="ti ti-clipboard-check" aria-hidden="true" />
+          <IconClipboardCheck size={18} stroke={1.75} aria-hidden="true" />
           Evaluations
         </button>
         <button className={`nav-item ${isActive('/coaching') ? 'active' : ''}`}
           onClick={() => safeNavigate('/coaching')}>
-          <i className="ti ti-school" aria-hidden="true" />
+          <IconSchool size={18} stroke={1.75} aria-hidden="true" />
           Coaching
         </button>
         {['owner','admin','evaluator'].includes(profile?.role) && (
           <button className={`nav-item ${isActive('/calibration') ? 'active' : ''}`}
             onClick={() => safeNavigate('/calibration')}>
-            <i className="ti ti-target" aria-hidden="true" />
+            <IconTarget size={18} stroke={1.75} aria-hidden="true" />
             Calibration
           </button>
         )}
         {['viewer', 'admin', 'owner'].includes(profile?.role) && (
           <button className={`nav-item ${isActive('/contact') ? 'active' : ''}`}
             onClick={() => safeNavigate('/contact')}>
-            <i className="ti ti-messages" aria-hidden="true" />
+            <IconMessages size={18} stroke={1.75} aria-hidden="true" />
             Contact Us
           </button>
         )}
         {['evaluator', 'team_leader', 'admin', 'owner'].includes(profile?.role) && (
           <button className={`nav-item ${isActive('/issues') ? 'active' : ''}`}
             onClick={() => safeNavigate('/issues')}>
-            <i className="ti ti-bug" aria-hidden="true" />
+            <IconBug size={18} stroke={1.75} aria-hidden="true" />
             Issue Management
           </button>
         )}
@@ -170,7 +174,7 @@ export default function Navbar() {
             Authoring is restricted inside the page and by RLS. */}
         <button className={`nav-item ${isActive('/quality-docs') ? 'active' : ''}`}
           onClick={() => safeNavigate('/quality-docs')}>
-          <i className="ti ti-book" aria-hidden="true" />
+          <IconBook size={18} stroke={1.75} aria-hidden="true" />
           Quality Documentation
         </button>
       </div>
@@ -179,7 +183,7 @@ export default function Navbar() {
         <div className="navbar-admin-section" style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
           <button className={`nav-item ${isActive('/admin') ? 'active' : ''}`}
             onClick={() => safeNavigate('/admin')}>
-            <i className="ti ti-settings" aria-hidden="true" />
+            <IconSettings size={18} stroke={1.75} aria-hidden="true" />
             Control Room
           </button>
         </div>
