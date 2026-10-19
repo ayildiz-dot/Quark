@@ -11,6 +11,17 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+// Agent dispute window (hours). Required on every scorecard: a whole number from 1 to 8760.
+// Mirrors the scorecards_dispute_window_hours_check constraint in the database, so a bad
+// value is caught here with a readable message instead of a raw constraint error.
+// Returns the number when valid, otherwise null.
+const parseDisputeHours = (v) => {
+  if (v === '' || v === null || v === undefined) return null
+  const n = Number(v)
+  if (!Number.isInteger(n) || n < 1 || n > 8760) return null
+  return n
+}
+
 export default function ScorecardBuilder() {
   const { id } = useParams()
   const { profile, unsavedChanges, setUnsavedChanges, setShowNavModal, setPendingNavPath, safeNavigate } = useAuth()
@@ -56,7 +67,10 @@ export default function ScorecardBuilder() {
         version_reason: reason,
         version_number: versionNum,
         snapshot: {
-          scorecard: { name: scorecard.name, description: scorecard.description, is_published: scorecard.is_published },
+          scorecard: {
+            name: scorecard.name, description: scorecard.description, is_published: scorecard.is_published,
+            dispute_window_hours: scorecard.dispute_window_hours
+          },
           questions: questions.map(q => ({
             title: q.title, weight: q.weight, description: q.description,
             is_form_critical: q.is_form_critical, allow_na: q.allow_na
@@ -190,9 +204,21 @@ export default function ScorecardBuilder() {
     return true
   }
 
+  // Spot-check scorecards never show the field (agents never see those evaluations), so
+  // they are not blocked here; their stored value is simply carried through unchanged.
+  const checkDisputeWindow = () => {
+    if (scorecard?.is_spot_check) return true
+    if (parseDisputeHours(scorecard?.dispute_window_hours) === null) {
+      flash('Agent dispute window must be a whole number of hours between 1 and 8760.', false)
+      return false
+    }
+    return true
+  }
+
   const saveAllChanges = async () => {
     if (leavingRef.current || skipSaveRef.current) return
     if (!division) return flash('Please select a division before saving. Every scorecard must belong to a division.', false)
+    if (!checkDisputeWindow()) return
     if (!checkTotalWeight()) return
     // Show version reason modal — actual save runs in executeVersionSave
     setVersionReason('')
@@ -228,6 +254,7 @@ export default function ScorecardBuilder() {
         is_calibration: scorecard.is_calibration || false,
         ai_dsat_enabled: scorecard.ai_dsat_enabled || false,
         ai_dsat_prompt: scorecard.ai_dsat_prompt || null,
+        dispute_window_hours: parseDisputeHours(scorecard.dispute_window_hours) ?? 72,
         updated_at: new Date().toISOString()
       }).eq('id', id))
 
@@ -936,6 +963,20 @@ export default function ScorecardBuilder() {
               </span>
             </div>
           )}
+          {/* Hidden on spot-check scorecards: agents never see those evaluations, so they
+              can never be disputed by an agent. */}
+          {!scorecard.is_spot_check && (
+            <div className="form-field" style={{ marginBottom: 16 }}>
+              <label>Agent dispute window (hours) <span style={{ color: 'var(--danger)' }}>*</span></label>
+              <input type="number" className="input" min={1} max={8760} step={1}
+                value={scorecard.dispute_window_hours ?? ''}
+                onChange={e => { setScorecard(s => ({ ...s, dispute_window_hours: e.target.value === '' ? '' : Number(e.target.value) })); markChanged() }} />
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, display: 'block' }}>
+                How long an agent has to dispute an evaluation on this scorecard, counted from when it was submitted.
+                Whole hours, 1 to 8760. A change applies only to evaluations submitted after you save it.
+              </span>
+            </div>
+          )}
           <div className="form-field" style={{ marginBottom: 16 }}>
             <label>Division</label>
             <select className="select" value={division}
@@ -965,6 +1006,7 @@ export default function ScorecardBuilder() {
           {!isPublished && (
             <button className="btn btn-primary" onClick={async () => {
               if (!division) return flash('Please select a division before saving. Every scorecard must belong to a division.', false)
+              if (!checkDisputeWindow()) return
               const { error } = await supabase.from('scorecards')
                 .update({ name: scorecard.name, description: scorecard.description,
                   pass_threshold: scorecard.type === 'quality' ? (Number(scorecard.pass_threshold) || 90) : null,
@@ -972,6 +1014,7 @@ export default function ScorecardBuilder() {
                   is_calibration: scorecard.is_calibration || false,
                   ai_dsat_enabled: scorecard.ai_dsat_enabled || false,
                   ai_dsat_prompt: scorecard.ai_dsat_prompt || null,
+                  dispute_window_hours: parseDisputeHours(scorecard.dispute_window_hours) ?? 72,
                   updated_at: new Date().toISOString() })
                 .eq('id', id)
               if (error) return flash(error.message, false)
