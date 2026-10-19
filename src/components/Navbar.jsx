@@ -18,6 +18,16 @@ const SCHEMES = [
   { key: 'crimson',  label: 'Berry',    swatch: '#d6409f' },
 ]
 
+// Dark mode variants. The saved users.theme value is the key: 'dark' (Dim) stays the
+// default so everyone already on dark mode lands on it without any data change.
+// index.css reads data-theme="dark" for all three plus data-dark for Deep and Soft.
+const DARK_MODES = [
+  { key: 'dark-deep', label: 'Deep', chip: '#16191F', attr: 'deep' },
+  { key: 'dark',      label: 'Dim',  chip: '#1F2228', attr: null },
+  { key: 'dark-soft', label: 'Soft', chip: '#2C3037', attr: 'soft' },
+]
+const isDark = (t) => String(t || '').startsWith('dark')
+
 export default function Navbar() {
   const { profile, logout, unsavedChanges, setShowNavModal, setPendingNavPath } = useAuth()
   const navigate = useNavigate()
@@ -34,15 +44,21 @@ export default function Navbar() {
 
   // Apply theme + scheme to <html> and cache them.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
+    const root = document.documentElement
+    const variant = DARK_MODES.find(m => m.key === theme)
+    root.setAttribute('data-theme', isDark(theme) ? 'dark' : 'light')
+    if (variant && variant.attr) root.setAttribute('data-dark', variant.attr)
+    else root.removeAttribute('data-dark')
     localStorage.setItem('quark-theme', theme)
+    // Remember the last dark variant, so switching Light -> Dark returns to it.
+    if (isDark(theme)) localStorage.setItem('quark-last-dark', theme)
   }, [theme])
   useEffect(() => {
     const root = document.documentElement
     clearAccent()
     if (scheme && scheme.charAt(0) === '#') {
       root.removeAttribute('data-scheme')
-      applyAccent(scheme, theme)
+      applyAccent(scheme, isDark(theme) ? 'dark' : 'light')
     } else if (scheme && scheme !== 'default') {
       root.setAttribute('data-scheme', scheme)
     } else {
@@ -72,6 +88,11 @@ export default function Navbar() {
   }
 
   const chooseTheme = (t) => { setTheme(t); persist({ theme: t }) }
+  const chooseDark = () => {
+    if (isDark(theme)) return
+    const last = localStorage.getItem('quark-last-dark')
+    chooseTheme(DARK_MODES.some(m => m.key === last) ? last : 'dark')
+  }
   const chooseScheme = (sc) => { setScheme(sc); persist({ color_scheme: sc }) }
   const chooseAccent = (hex) => {
     setScheme(hex)
@@ -229,15 +250,26 @@ export default function Navbar() {
               <span className={`role-chip role-${roleClass}`}>{roleLabel}</span>
             </div>
 
-            {/* Appearance: theme toggle */}
+            {/* Appearance: theme toggle, plus the dark variant when dark is on */}
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>Appearance</div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className={`btn btn-sm ${theme === 'dark' ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ flex: 1, justifyContent: 'center' }} onClick={() => chooseTheme('dark')}>☾ Dark</button>
+                <button className={`btn btn-sm ${isDark(theme) ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ flex: 1, justifyContent: 'center' }} onClick={chooseDark}>☾ Dark</button>
                 <button className={`btn btn-sm ${theme === 'light' ? 'btn-primary' : 'btn-outline'}`}
                   style={{ flex: 1, justifyContent: 'center' }} onClick={() => chooseTheme('light')}>☀ Light</button>
               </div>
+              {isDark(theme) && (
+                <div className="dark-modes" role="group" aria-label="Dark mode shade">
+                  {DARK_MODES.map(m => (
+                    <button key={m.key} type="button" className="dark-mode"
+                      aria-pressed={theme === m.key} onClick={() => chooseTheme(m.key)}>
+                      <span className="dark-mode-chip" style={{ background: m.chip }} />
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Accent color */}

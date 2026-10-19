@@ -9,33 +9,35 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ========================= Tokens: dark (default) ========================= */
+/* ========================= Tokens: dark (default = Dim) =========================
+   Three dark palettes. Navbar.jsx keeps data-theme="dark" for all of them and adds
+   data-dark="deep" or data-dark="soft"; Dim (saved as theme = 'dark') needs no attribute. */
 :root {
   /* Surfaces, from back to front: canvas, sheet, wells, hover */
-  --bg-primary:    #0E1014;   /* canvas behind everything */
-  --bg-surface:    #16191F;   /* the raised page sheet, cards, modals */
-  --bg-secondary:  #1C2028;   /* wells: table headers, inputs' hover, inner boxes */
-  --bg-hover:      #242934;
+  --bg-primary:    #17191E;   /* canvas behind everything */
+  --bg-surface:    #1F2228;   /* the raised page sheet, cards, modals */
+  --bg-secondary:  #262A31;   /* wells: table headers, inner boxes */
+  --bg-hover:      #2F333B;
   --sidebar-bg:    transparent;
 
   --accent:          #7D97E0;
   --accent-hover:    #93A9E8;
-  --accent-light:    #1E2639;
+  --accent-light:    #263252;
   --accent-contrast: #0E1014;
 
-  --success:       #6FC39C;
-  --success-light: #16281F;
-  --danger:        #E58C83;
-  --danger-light:  #2E1A18;
-  --warning:       #E2B465;
-  --warning-light: #2C2313;
+  --success:       #74C7A0;
+  --success-light: #1D3128;
+  --danger:        #E8928A;
+  --danger-light:  #3A2321;
+  --warning:       #E5B96C;
+  --warning-light: #382D18;
 
-  --text-primary:   #E9EBEF;
-  --text-secondary: #A9AFBA;
-  --text-tertiary:  #6E7581;
+  --text-primary:   #ECEEF1;
+  --text-secondary: #B0B6C0;
+  --text-tertiary:  #7D8490;
 
-  --border:       #262B34;
-  --border-light: #323844;
+  --border:       #30343C;
+  --border-light: #3C414A;
 
   /* Radii step down with the size of the element */
   --radius-sheet: 22px;
@@ -58,6 +60,41 @@
   --bg-main: var(--bg-secondary);
 
   color-scheme: dark;
+}
+
+/* Deep: the darkest option, near black */
+:root[data-dark="deep"]:not([data-theme="light"]) {
+  --bg-primary:    #0E1014;
+  --bg-surface:    #16191F;
+  --bg-secondary:  #1C2028;
+  --bg-hover:      #242934;
+  --accent-light:  #1E2639;
+  --success-light: #16281F;
+  --danger-light:  #2E1A18;
+  --warning-light: #2C2313;
+  --text-primary:   #E9EBEF;
+  --text-secondary: #A9AFBA;
+  --text-tertiary:  #6E7581;
+  --border:       #262B34;
+  --border-light: #323844;
+}
+
+/* Soft: a lighter charcoal, easiest on the eyes for long reading */
+:root[data-dark="soft"]:not([data-theme="light"]) {
+  --bg-primary:    #24272D;
+  --bg-surface:    #2C3037;
+  --bg-secondary:  #343840;
+  --bg-hover:      #3D414A;
+  --accent-light:  #2F3B5E;
+  --success-light: #233A2F;
+  --danger-light:  #462926;
+  --warning-light: #44361D;
+  --text-primary:   #F1F2F5;
+  --text-secondary: #BCC2CB;
+  --text-tertiary:  #8D939E;
+  --border:       #3D414A;
+  --border-light: #4A4F59;
+  --shadow-sheet: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 18px 44px -24px rgba(0, 0, 0, .5);
 }
 
 /* ========================= Tokens: light ========================= */
@@ -132,7 +169,7 @@ a:hover { color: var(--accent-hover); }
   min-height: calc(100vh - 24px);
   overflow-y: auto;
 }
-.page { max-width: 1240px; margin: 0 auto; }
+.page { max-width: 1680px; margin: 0 auto; }
 
 /* Page header */
 .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 14px; }
@@ -182,6 +219,19 @@ a:hover { color: var(--accent-hover); }
 .role-evaluator { background: var(--accent-light); color: var(--accent); }
 .role-team_leader { background: var(--bg-hover); color: var(--text-secondary); }
 .role-viewer { background: var(--bg-hover); color: var(--text-secondary); }
+
+/* Dark mode picker (Navbar account settings) */
+.dark-modes { display: flex; gap: 6px; margin-top: 8px; }
+.dark-mode {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px 4px 7px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg-secondary);
+  color: var(--text-secondary); font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: border-color var(--t) var(--ease), color var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.dark-mode:hover { border-color: var(--border-light); color: var(--text-primary); }
+.dark-mode[aria-pressed="true"] { border-color: var(--accent); color: var(--text-primary); box-shadow: 0 0 0 3px var(--accent-light); }
+.dark-mode-chip { width: 30px; height: 18px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
 
 /* ========================= Buttons ========================= */
 .btn {
