@@ -5,7 +5,7 @@ import { useAuth } from '../App'
 import CoachingQueue, { getMeta, isCoachable, coachingSla } from '../components/CoachingQueue'
 import { getEvaluatorScope } from '../lib/evaluatorScope'
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const MODELS = [
   { value: 'GROW',     label: 'GROW (Goal · Reality · Options · Will)' },
   { value: 'CLEAR',    label: 'CLEAR (Contract · Listen · Explore · Action · Review)' },
@@ -36,7 +36,7 @@ const StatusBadge = ({ status }) => {
   )
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const plusDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0] }
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—'
 function isoWeek(dateStr) {
@@ -47,7 +47,7 @@ function isoWeek(dateStr) {
   return `${d.getFullYear()}-W${String(wk).padStart(2, '0')}`
 }
 
-// ─── Confirm modal ──────────────────────────────────────────────────────────
+// ─── Confirm modal ────────────────────────────────────────────────────────────
 function ConfirmModal({ message, onYes, onNo }) {
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: '#00000066',
@@ -266,7 +266,7 @@ function NewObservationModal({ profile, isPrivileged, gov, parent, flash, onClos
   )
 }
 
-// ─── Session detail modal ───────────────────────────────────────────────────
+// ─── Session detail modal ─────────────────────────────────────────────────────
 function SessionDetail({ session, profile, isCoach, flash, onClose, onChanged, onRecoach, onResumeDraft }) {
   const [focus, setFocus]     = useState([])
   const [actions, setActions] = useState([])
@@ -410,7 +410,7 @@ function SessionDetail({ session, profile, isCoach, flash, onClose, onChanged, o
 
           {isCoach && !isClosed && session.status !== 'draft' && (
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <div style={label}>Verification & close-out</div>
+              <div style={label}>Verification &amp; close-out</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {session.status === 'active' && <button className="btn btn-ghost btn-sm" onClick={moveToVerification}>Move to pending verification</button>}
                 <button className="btn btn-sm btn-primary" disabled={!allResolved} title={allResolved ? '' : 'Resolve all action items first'} onClick={() => closeSession(true)}>Close — Met</button>
@@ -426,7 +426,7 @@ function SessionDetail({ session, profile, isCoach, flash, onClose, onChanged, o
   )
 }
 
-// ─── Drafts modal (own drafts, like Evaluations page) ───────────────────────
+// ─── Drafts modal (own drafts, like Evaluations page) ────────────────────────
 function DraftsModal({ drafts, onClose, onOpen, onDelete }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -453,7 +453,7 @@ function DraftsModal({ drafts, onClose, onOpen, onDelete }) {
   )
 }
 
-// ─── Sessions table ─────────────────────────────────────────────────────────
+// ─── Sessions table ───────────────────────────────────────────────────────────
 function SessionsTable({ rows, counts, onView }) {
   const thStyle = { padding: '10px 16px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }
   const tdStyle = { padding: '10px 16px' }
@@ -490,7 +490,7 @@ function SessionsTable({ rows, counts, onView }) {
   )
 }
 
-// ─── Observation Insights tab ───────────────────────────────────────────────
+// ─── Observation Insights tab ─────────────────────────────────────────────────
 function InsightsTab({ sessions, counts, govNames }) {
   const [fAgent, setAgent] = useState('')
   const [fCoach, setCoach] = useState('')
@@ -630,7 +630,7 @@ function InsightsTab({ sessions, counts, govNames }) {
   )
 }
 
-// ─── Placeholder tab ────────────────────────────────────────────────────────
+// ─── Placeholder tab ──────────────────────────────────────────────────────────
 function ComingSoon({ title }) {
   return (
     <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)', fontSize: 14 }}>
@@ -639,7 +639,7 @@ function ComingSoon({ title }) {
   )
 }
 
-// ─── Root ───────────────────────────────────────────────────────────────────
+// ─── Root ─────────────────────────────────────────────────────────────────────
 // -- Agent view: per-evaluation coachings (acknowledge on page) ---------------
 function AgentCoachingDetail({ c, onClose, onAck, busy }) {
   const evalNo = `#${c._evalNo}`
@@ -1251,13 +1251,10 @@ export default function Coaching() {
       <div className="page">
         <div className="page-header"><div><h1>Coaching</h1></div></div>
         {msg && <div className={`flash ${msg.ok ? 'flash-ok' : 'flash-err'}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><span>{msg.text}</span><button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.2)', color: 'inherit', flexShrink: 0 }} onClick={() => setMsg(null)}>OK</button></div>}
-        <div style={{ display: 'flex', marginBottom: 24, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        {/* Shared pill tabs from index.css, so every page's tab bar looks the same. */}
+        <div className="tabs">
           {[['coaching', 'Coaching Sessions'], ['observations', 'Observation Sessions']].map(([key, lbl]) => (
-            <button key={key} onClick={() => setAgentTab(key)} style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: '8px 18px', fontSize: 13,
-              fontWeight: agentTab === key ? 600 : 400, color: agentTab === key ? 'var(--text-primary)' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${agentTab === key ? 'var(--accent, #2563eb)' : 'transparent'}`, marginBottom: -1,
-            }}>{lbl}</button>
+            <button key={key} className={`tab ${agentTab === key ? 'active' : ''}`} onClick={() => setAgentTab(key)}>{lbl}</button>
           ))}
         </div>
         {agentTab === 'coaching'
@@ -1291,13 +1288,10 @@ export default function Coaching() {
         </div>
       )}
 
-      <div style={{ display: 'flex', marginBottom: 24, borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+      {/* Shared pill tabs from index.css, so every page's tab bar looks the same. */}
+      <div className="tabs">
         {TABS.map(([key, label]) => (
-          <button key={key} onClick={() => setTab(key)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '8px 18px', fontSize: 13,
-            fontWeight: tab === key ? 600 : 400, color: tab === key ? 'var(--text-primary)' : 'var(--text-secondary)',
-            borderBottom: `2px solid ${tab === key ? 'var(--accent, #2563eb)' : 'transparent'}`, marginBottom: -1,
-          }}>{label}</button>
+          <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>{label}</button>
         ))}
       </div>
 
@@ -1305,9 +1299,9 @@ export default function Coaching() {
         <>
           {tab === 'sessions' && (
             <>
-              <h2 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active & Pending Verification</h2>
+              <h2 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active &amp; Pending Verification</h2>
               <div style={{ marginBottom: 28 }}><SessionsTable rows={activeRows} counts={counts} onView={setDetail} /></div>
-              <h2 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Closed & Cancelled</h2>
+              <h2 style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Closed &amp; Cancelled</h2>
               <SessionsTable rows={closedRows} counts={counts} onView={setDetail} />
             </>
           )}
