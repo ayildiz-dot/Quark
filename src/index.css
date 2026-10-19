@@ -39,6 +39,11 @@
   --border:       #30343C;
   --border-light: #3C414A;
 
+  /* Accent tint strength (see body and .main-content). Kept deliberately tiny. */
+  --tint-a: 8%;
+  --tint-b: 4%;
+  --tint-sheet: 2.5%;
+
   /* Radii step down with the size of the element */
   --radius-sheet: 22px;
   --radius-lg:    14px;
@@ -99,6 +104,9 @@
 
 /* ========================= Tokens: light ========================= */
 [data-theme="light"] {
+  --tint-a: 6%;
+  --tint-b: 3%;
+  --tint-sheet: 1.8%;
   --bg-primary:    #EEF0F3;
   --bg-surface:    #FFFFFF;
   --bg-secondary:  #F5F6F8;
@@ -133,7 +141,14 @@
 /* ========================= Base ========================= */
 body {
   font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
+  /* Accent tint: two very faint glows on the canvas, mixed from the chosen accent, so the
+     colour picker is felt across the page and not only on buttons. Browsers without
+     color-mix() drop this line and keep the plain canvas. */
+  background-image:
+    radial-gradient(1100px 760px at 0% 0%, color-mix(in srgb, var(--accent) var(--tint-a), transparent), transparent 70%),
+    radial-gradient(900px 700px at 100% 100%, color-mix(in srgb, var(--accent) var(--tint-b), transparent), transparent 70%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.55;
@@ -162,7 +177,9 @@ a:hover { color: var(--accent-hover); }
   min-width: 0;
   margin: 12px 12px 12px var(--nav-w);
   padding: 32px 36px 40px;
-  background: var(--bg-surface);
+  background-color: var(--bg-surface);
+  /* The faintest wash of the accent at the top of the sheet, fading out within ~320px. */
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--accent) var(--tint-sheet), transparent) 0, transparent 320px);
   border: 1px solid var(--border);
   border-radius: var(--radius-sheet);
   box-shadow: var(--shadow-sheet);
