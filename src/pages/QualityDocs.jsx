@@ -371,7 +371,7 @@ function Toolbar({ editor, onImage, busyImage }) {
   )
 }
 
-/* ───────────────────────────── shared editor styles ───────────────────────── */
+/* ─────────────────────────── shared editor styles ─────────────────────────── */
 /* Injected once. Tables and images need real CSS to be usable, and there is no
    stylesheet in this project that knows about ProseMirror. */
 const EDITOR_CSS = `
@@ -413,7 +413,50 @@ function useEditorStyles() {
   }, [])
 }
 
-/* ───────────────────────────────── list view ──────────────────────────────── */
+/* ─────────────────────────────── list search ─────────────────────────────── */
+
+/* A document's body is TipTap JSON, so its words sit in the text of the leaf nodes.
+   docText walks the tree and joins them: text runs inside one paragraph are joined
+   directly (a word split by bold or colour stays one word), while separate blocks,
+   list items and table cells get a space between them so words never run together. */
+function docText(node) {
+  if (!node) return ''
+  if (node.type === 'text') return node.text || ''
+  if (node.type === 'hardBreak') return ' '
+  if (!Array.isArray(node.content)) return ''
+  return node.content
+    .map(c => (c && c.type === 'text') ? (c.text || '') : ' ' + docText(c) + ' ')
+    .join('')
+}
+
+/* Case- and accent-insensitive form used for matching, so "dsat" finds "DSAT" and
+   "cafe" finds "café". The character class is the Unicode combining-diacritics range. */
+const fold = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/* A short excerpt around the first place `term` appears in the body, so a card that
+   matched on its content shows why. Returned as three plain strings and rendered as text,
+   never as HTML. Folding can change a string's length for a few unusual characters; in
+   that case the positions would not line up, so no excerpt is shown (the card still
+   matches). */
+function snippetFor(text, term) {
+  const folded = fold(text)
+  if (folded.length !== text.length) return null
+  const i = folded.indexOf(term)
+  if (i < 0) return null
+  let start = Math.max(0, i - 50)
+  if (start > 0) {
+    const sp = text.indexOf(' ', start)
+    if (sp > -1 && sp < i) start = sp + 1
+  }
+  const end = Math.min(text.length, i + term.length + 90)
+  return {
+    before: (start > 0 ? '…' : '') + text.slice(start, i),
+    match: text.slice(i, i + term.length),
+    after: text.slice(i + term.length, end) + (end < text.length ? '…' : ''),
+  }
+}
+
+/* ─────────────────────────────── list view ─────────────────────────────── */
 
 export default function QualityDocs() {
   const { profile } = useAuth()
@@ -424,14 +467,25 @@ export default function QualityDocs() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
 
+  // The body (content) is loaded too, so search can look inside documents and not only at
+  // titles. The searchable text is built once here rather than on every keystroke, and
+  // the raw JSON is dropped afterwards since the list never renders it.
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('quality_documents')
-      .select('id, title, summary, is_published, version, updated_at, updated_by, users:updated_by(name)')
+      .select('id, title, summary, content, is_published, version, updated_at, updated_by, users:updated_by(name)')
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
-    setDocs(data || [])
+    setDocs((data || []).map(({ content, ...d }) => {
+      const body = docText(content).replace(/\s+/g, ' ').trim()
+      return {
+        ...d,
+        _body: body,
+        _head: fold(`${d.title || ''} ${d.summary || ''}`),
+        _hay: fold(`${d.title || ''} ${d.summary || ''} ${body}`),
+      }
+    }))
     setLoading(false)
   }, [])
 
@@ -445,9 +499,9 @@ export default function QualityDocs() {
     navigate(`/quality-docs/${data.id}/edit`)
   }
 
-  const shown = docs.filter(d =>
-    !q || (d.title || '').toLowerCase().includes(q.toLowerCase())
-       || (d.summary || '').toLowerCase().includes(q.toLowerCase()))
+  // Every word typed must appear somewhere in the title, summary or body, in any order.
+  const terms = fold(q).split(/\s+/).filter(Boolean)
+  const shown = terms.length === 0 ? docs : docs.filter(d => terms.every(t => d._hay.includes(t)))
 
   if (loading) return <div className="page"><div className="spinner" /></div>
 
@@ -461,8 +515,8 @@ export default function QualityDocs() {
         {canEdit && <button className="btn btn-primary" onClick={createDoc}>+ New Documentation</button>}
       </div>
 
-      <input className="input" placeholder="Search documentation…" value={q} onChange={e => setQ(e.target.value)}
-        style={{ maxWidth: 320, marginBottom: 20 }} />
+      <input className="input" placeholder="Search titles and content…" value={q} onChange={e => setQ(e.target.value)}
+        style={{ maxWidth: 360, marginBottom: 20 }} />
 
       {shown.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -470,7 +524,12 @@ export default function QualityDocs() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {shown.map(d => (
+          {shown.map(d => {
+            // Excerpt only when a word matched in the body and not already in the title or
+            // summary; otherwise the card itself already shows why it matched.
+            const bodyTerm = terms.find(t => !d._head.includes(t))
+            const snip = bodyTerm ? snippetFor(d._body, bodyTerm) : null
+            return (
             <div key={d.id} className="card"
               onClick={() => navigate(`/quality-docs/${d.id}`)}
               onMouseEnter={e => {
@@ -498,20 +557,31 @@ export default function QualityDocs() {
                 {d.summary && (
                   <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{d.summary}</div>
                 )}
+                {snip && (
+                  <div style={{
+                    fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55, marginTop: 10,
+                    padding: '7px 10px', borderRadius: 8, background: 'var(--bg-secondary)',
+                  }}>
+                    {snip.before}
+                    <mark style={{ background: 'var(--accent-light)', color: 'var(--text-primary)', borderRadius: 3, padding: '0 2px' }}>{snip.match}</mark>
+                    {snip.after}
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>
                 v{d.version} · updated {new Date(d.updated_at).toLocaleDateString()}
                 {d.users?.name ? ` · ${d.users.name}` : ''}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
-/* ───────────────────────────────── reader ─────────────────────────────────── */
+/* ─────────────────────────────── reader ─────────────────────────────── */
 
 export function QualityDocView() {
   const { id } = useParams()
@@ -572,7 +642,7 @@ export function QualityDocView() {
   )
 }
 
-/* ───────────────────────────────── editor ─────────────────────────────────── */
+/* ─────────────────────────────── editor ─────────────────────────────── */
 
 export function QualityDocEdit() {
   const { id } = useParams()
@@ -782,7 +852,7 @@ export function QualityDocEdit() {
   )
 }
 
-/* ───────────────────────────────── history ───────────────────────────────── */
+/* ─────────────────────────────── history ─────────────────────────────── */
 
 
 /* Block-level diff between two versions.
