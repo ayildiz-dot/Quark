@@ -216,6 +216,10 @@ function DisputeModal({ dispute: d0, profile, navigate, onClose, onChanged, flas
   const [ev, setEv] = useState(null)
   const [scores, setScores] = useState([])
   const [comment, setComment] = useState('')
+  // Email subject for the "Send email to internal quality mgmt" step. The inputs and the
+  // tl_send_to_bpo_final call below read `subject`, but it was never declared in this
+  // component, so rendering those states threw a ReferenceError and blanked the page.
+  const [subject, setSubject] = useState('')
   const [busy, setBusy] = useState(false)
   const [tookOver, setTookOver] = useState(false)
   const me = profile?.id
@@ -893,7 +897,7 @@ export default function Evaluations() {
   const openDetail = async (id) => {
     const { data: ev } = await supabase
       .from('evaluations')
-      .select('*, scorecards!evaluations_scorecard_id_fkey(name, type, pass_threshold, is_spot_check), users!evaluations_evaluator_id_fkey(name, email)')
+      .select('*, scorecards!evaluations_scorecard_id_fkey(name, type, pass_threshold, is_spot_check, dispute_window_hours), users!evaluations_evaluator_id_fkey(name, email)')
       .eq('id', id)
       .single()
     // Quality evaluations store per-question scores in evaluation_scores.
@@ -1484,12 +1488,32 @@ export default function Evaluations() {
               )}
               {profile?.role === 'viewer' && (() => {
                 const dsp = myDisputes[detail.id]
-                const canRaise = !dsp || dsp.status === 'cancelled'
+                // The agent's window to raise a dispute, counted from this evaluation's
+                // submission. Uses the hours stamped on the evaluation at submit time; older
+                // evaluations without a stamp fall back to the scorecard's current setting,
+                // then 72. Mirrors the check in raise_dispute: the server is the boundary,
+                // this only decides what renders, so the button never leads to an error.
+                const windowHours = detail.dispute_window_hours ?? detail.scorecards?.dispute_window_hours ?? 72
+                const hoursSince = detail.submitted_at ? (Date.now() - new Date(detail.submitted_at).getTime()) / 3600000 : null
+                const windowOpen = hoursSince != null && hoursSince < windowHours
+                const hoursLeft = windowOpen ? Math.max(1, Math.ceil(windowHours - hoursSince)) : 0
+                const noActiveDispute = !dsp || dsp.status === 'cancelled'
+                const canRaise = noActiveDispute && windowOpen
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                     {dsp && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Dispute: {DISPUTE_STATUS[dsp.status]?.label || dsp.status}</span>}
                     {dsp && <button className="btn btn-ghost btn-sm" onClick={() => { setDisputeModal(dsp); setDetail(null) }}>View dispute</button>}
                     {canRaise && <button className="btn btn-outline btn-sm" onClick={() => { setRaiseDispute(detail); setDetail(null) }}>Dispute this evaluation</button>}
+                    {canRaise && (
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {hoursLeft}h left to dispute
+                      </span>
+                    )}
+                    {noActiveDispute && !windowOpen && (
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        The {windowHours}-hour window to dispute this evaluation has closed.
+                      </span>
+                    )}
                   </div>
                 )
               })()}
