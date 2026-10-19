@@ -4,7 +4,7 @@ import { useAuth } from '../App'
 import { supabase } from '../lib/supabase'
 import { calculateQualityScore, answerEarnsWeight } from '../lib/scoring'
 
-// ── Shared ───────────────────────────────────────────────────────────────────
+// ── Shared ────────────────────────────────────────────────────────────────────
 
 // Today as YYYY-MM-DD in the user's local timezone. Built from local date parts rather
 // than toISOString(), which converts to UTC first and can hand back yesterday for anyone
@@ -38,7 +38,7 @@ function ResultBadge({ calibrated }) {
   )
 }
 
-// ── CalibrationHome ──────────────────────────────────────────────────────────
+// ── CalibrationHome ───────────────────────────────────────────────────────────
 
 function CalibrationHome({ onScore }) {
   const { profile } = useAuth()
@@ -281,7 +281,7 @@ function CalibrationHome({ onScore }) {
   )
 }
 
-// ── CalibrationSubmit (Steps 5 + 6) ──────────────────────────────────────────
+// ── CalibrationSubmit (Steps 5 + 6) ───────────────────────────────────────────
 
 function CalibrationSubmit({ session, onBack, onSubmitted }) {
   const { profile } = useAuth()
@@ -434,7 +434,7 @@ function CalibrationSubmit({ session, onBack, onSubmitted }) {
     }, 50)
   }
 
-  // ── Submit handler ─────────────────────────────────────────────────────────
+  // ── Submit handler ────────────────────────────────────────────────────────
 
   async function handleSubmit() {
     const unanswered = questions.filter(q => !answers[q.id])
@@ -728,7 +728,7 @@ function CalibrationSubmit({ session, onBack, onSubmitted }) {
   )
 }
 
-// ── CalibrationAdmin (Step 8) ────────────────────────────────────────────────
+// ── CalibrationAdmin (Step 8) ─────────────────────────────────────────────────
 
 function CalibrationAdmin() {
   const { profile } = useAuth()
@@ -1340,7 +1340,7 @@ function WeeklyDeltaChart({ data }) {
   )
 }
 
-// ── CalibrationInsights (BI overview) ────────────────────────────────────────
+// ── CalibrationInsights (BI overview) ─────────────────────────────────────────
 
 function CalibrationInsights() {
   const { profile } = useAuth()
@@ -1922,18 +1922,11 @@ export default function Calibration() {
       </div>
 
       {(canManage || canSeeInsights) && (
-        <div style={{ display: 'flex', marginBottom: 28, borderBottom: '1px solid var(--border)' }}>
+        // Shared pill tabs from index.css, so every page's tab bar looks the same.
+        <div className="tabs">
           {tabs.map(([key, label]) => (
-            <button key={key}
-              onClick={() => { setTab(key); setScoring(null) }}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                padding: '8px 18px', fontSize: 13,
-                fontWeight: tab === key ? 600 : 400,
-                color: tab === key ? 'var(--text-primary)' : 'var(--text-secondary)',
-                borderBottom: `2px solid ${tab === key ? 'var(--accent, #2563eb)' : 'transparent'}`,
-                marginBottom: -1,
-              }}>
+            <button key={key} className={`tab ${tab === key ? 'active' : ''}`}
+              onClick={() => { setTab(key); setScoring(null) }}>
               {label}
             </button>
           ))}
