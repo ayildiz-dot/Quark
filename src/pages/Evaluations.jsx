@@ -458,6 +458,10 @@ function DisputeInsights({ profile, onOpen }) {
     const isTL = profile?.role === 'team_leader'
     let q = supabase.from('disputes')
       .select('*, evaluator:users!disputes_evaluator_id_fkey(name), agent:users!disputes_agent_id_fkey(name)')
+      // Criticality disputes (a Team Leader challenging a Highly Critical / standalone
+      // marking) follow their own flow in the Coaching Queue and are not agent disputes,
+      // so they stay out of these figures. kind is NULL for agent disputes.
+      .or('kind.is.null,kind.neq.criticality')
       .order('created_at', { ascending: false }).limit(5000)
     if (!priv) {
       if (isTL) {
@@ -606,6 +610,18 @@ function DisputeInsights({ profile, onOpen }) {
 export default function Evaluations() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  // Single entry point for opening a dispute. Criticality disputes are decided in the
+  // Coaching Queue (criticality_marker_decide and friends); the modal on this page drives
+  // the agent-dispute functions, which must never act on them. So those are sent to the
+  // case itself, where the correct dispute section lives.
+  const openDispute = (d) => {
+    if (!d) return
+    if (d.kind === 'criticality') {
+      if (d.critical_case_id) navigate('/coaching?critical=' + d.critical_case_id)
+      return
+    }
+    setDisputeModal(d)
+  }
   const [data,    setData]    = useState([])
   const [total,   setTotal]   = useState(0)
   const [page,    setPage]    = useState(1)
@@ -733,7 +749,7 @@ export default function Evaluations() {
   useEffect(() => {
     const did = new URLSearchParams(window.location.search).get('dispute')
     if (!did || !profile?.id) return
-    supabase.from('disputes').select('*').eq('id', did).maybeSingle().then(({ data }) => { if (data) setDisputeModal(data) })
+    supabase.from('disputes').select('*').eq('id', did).maybeSingle().then(({ data }) => { if (data) openDispute(data) })
     window.history.replaceState({}, '', '/evaluations')
     // eslint-disable-next-line
   }, [profile])
@@ -765,7 +781,7 @@ export default function Evaluations() {
 
   const loadDisputes = async () => {
     if (!profile?.id) return
-    const { data: mine } = await supabase.from('disputes').select('*').eq('agent_id', profile.id).order('created_at', { ascending: false })
+    const { data: mine } = await supabase.from('disputes').select('*').eq('agent_id', profile.id).or('kind.is.null,kind.neq.criticality').order('created_at', { ascending: false })
     const mm = {}; (mine || []).forEach(d => { if (!(d.evaluation_id in mm)) mm[d.evaluation_id] = d }); setMyDisputes(mm)
   }
 
@@ -1381,7 +1397,7 @@ export default function Evaluations() {
       </div>
       </>)}
 
-      {view === 'disputes' && <DisputeInsights profile={profile} onOpen={setDisputeModal} />}
+      {view === 'disputes' && <DisputeInsights profile={profile} onOpen={openDispute} />}
 
       {/* DRAFTS MODAL */}
       {showDrafts && (
@@ -1502,7 +1518,7 @@ export default function Evaluations() {
                 return (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                     {dsp && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Dispute: {DISPUTE_STATUS[dsp.status]?.label || dsp.status}</span>}
-                    {dsp && <button className="btn btn-ghost btn-sm" onClick={() => { setDisputeModal(dsp); setDetail(null) }}>View dispute</button>}
+                    {dsp && <button className="btn btn-ghost btn-sm" onClick={() => { setDetail(null); openDispute(dsp) }}>View dispute</button>}
                     {canRaise && <button className="btn btn-outline btn-sm" onClick={() => { setRaiseDispute(detail); setDetail(null) }}>Dispute this evaluation</button>}
                     {canRaise && (
                       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
@@ -1533,7 +1549,7 @@ export default function Evaluations() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, background: 'rgba(245,158,11,0.10)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>This DSAT was spot-checked by a KG QA.</span>
                     {dsp && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Dispute: {DISPUTE_STATUS[dsp.status]?.label || dsp.status}</span>}
-                    {dsp && <button className="btn btn-ghost btn-sm" onClick={() => { setDisputeModal(dsp); setDetail(null) }}>View dispute</button>}
+                    {dsp && <button className="btn btn-ghost btn-sm" onClick={() => { setDetail(null); openDispute(dsp) }}>View dispute</button>}
                     {canRaise && <button className="btn btn-outline btn-sm" onClick={() => { setRaiseDsat(kgId); setDetail(null) }}>Dispute the KG spot-check</button>}
                     {canRaise && (
                       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
