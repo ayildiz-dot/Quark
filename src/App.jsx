@@ -21,6 +21,7 @@ import Coaching from './pages/Coaching'
 import ContactUs from './pages/ContactUs'
 import Issues from './pages/Issues'
 import QualityDocs, { QualityDocView, QualityDocEdit, QualityDocHistory } from './pages/QualityDocs'
+import Disputes from './pages/Disputes'
 
 export const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -118,6 +119,9 @@ function AppShell({ user, profile, logout, fetchProfile }) {
                 <Route path="/dashboard/:division/:scorecardId" element={<ScorecardDashboard />} />
                 <Route path="/evaluations" element={<Evaluations />} />
                 <Route path="/evaluations/new" element={<EvaluationForm />} />
+                {/* Disputes — every role except agents (viewer). The page scopes what each
+                    role sees, and RLS enforces it. */}
+                <Route path="/disputes" element={profile?.role && profile.role !== 'viewer' ? <Disputes /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/scorecards/:id/edit" element={isAdminOrOwner ? <ScorecardBuilder /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/scorecards/:id/history" element={isAdminOrOwner ? <ScorecardHistory /> : <Navigate to="/dashboard" replace />} />
                 <Route path="/admin" element={isAdminOrOwner ? <Admin /> : <Navigate to="/dashboard" replace />} />

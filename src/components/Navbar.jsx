@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../App'
 import {
   IconLayoutDashboard, IconClipboardCheck, IconSchool, IconTarget,
-  IconMessages, IconBug, IconBook, IconSettings,
+  IconMessages, IconBug, IconBook, IconSettings, IconGavel,
 } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import NotificationBell from './NotificationBell'
@@ -165,6 +165,15 @@ export default function Navbar() {
           <IconClipboardCheck size={18} stroke={1.75} aria-hidden="true" />
           Evaluations
         </button>
+        {/* Disputes — everyone except agents, the same audience the old Dispute Insights
+            tab had. What each role sees inside is scoped by the page and by RLS. */}
+        {profile?.role && profile.role !== 'viewer' && (
+          <button className={`nav-item ${isActive('/disputes') ? 'active' : ''}`}
+            onClick={() => safeNavigate('/disputes')}>
+            <IconGavel size={18} stroke={1.75} aria-hidden="true" />
+            Disputes
+          </button>
+        )}
         <button className={`nav-item ${isActive('/coaching') ? 'active' : ''}`}
           onClick={() => safeNavigate('/coaching')}>
           <IconSchool size={18} stroke={1.75} aria-hidden="true" />

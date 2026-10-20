@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { DISPUTE_STATUS } from '../lib/disputes'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../App'
 import { getEvaluatorScope } from '../lib/evaluatorScope'
@@ -115,22 +116,6 @@ function EditReviewModal({ request, onClose, onResolved, flash }) {
   )
 }
 
-const DISPUTE_STATUS = {
-  tl_pending:         { label: 'Awaiting Team Leader', color: '#f59e0b' },
-  evaluator_pending:  { label: 'Awaiting evaluator', color: '#f59e0b' },
-  tl_reconsider:      { label: 'Awaiting Team Leader', color: '#f59e0b' },
-  nudged:             { label: 'Awaiting evaluator (nudged)', color: '#f59e0b' },
-  admin_pending:      { label: 'Awaiting admin', color: '#f59e0b' },
-  evaluator_rejected: { label: 'Rejected by evaluator', color: '#ef4444' },
-  tl_rejected:        { label: 'Rejected by Team Leader', color: '#ef4444' },
-  upheld:             { label: 'Upheld', color: '#22c55e' },
-  accepted:           { label: 'Closed', color: '#64748b' },
-  cancelled:          { label: 'Cancelled', color: '#64748b' },
-  bpo_review_pending: { label: 'Awaiting BPO review', color: '#f59e0b' },
-  post_nudge_pending: { label: 'Awaiting mediator', color: '#f59e0b' },
-  bpo_final_pending:  { label: 'Awaiting BPO final review', color: '#f59e0b' },
-  rejected_final:     { label: 'Rejected (final)', color: '#ef4444' },
-}
 const DISPUTE_ACTION_LABEL = {
   raised: 'raised the dispute', tl_approved: 'approved (Team Leader)', tl_rejected: 'rejected (Team Leader)',
   evaluator_approved: 'upheld (evaluator)', evaluator_rejected: 'rejected (evaluator)', nudged: 'nudged the evaluator',
@@ -439,169 +424,6 @@ function DisputeModal({ dispute: d0, profile, navigate, onClose, onChanged, flas
             </div>
           )}
         </div>
-      </div>
-    </div>
-  )
-}
-
-function DisputeInsights({ profile, onOpen }) {
-  const [loading, setLoading] = useState(true)
-  const [rows, setRows] = useState([])
-  const [fStatus, setFStatus] = useState('')
-  const [fType, setFType] = useState('')
-  const [fFrom, setFrom] = useState('')
-  const [fTo, setTo] = useState('')
-
-  const load = async () => {
-    setLoading(true)
-    const priv = ['owner', 'admin'].includes(profile?.role)
-    const isTL = profile?.role === 'team_leader'
-    let q = supabase.from('disputes')
-      .select('*, evaluator:users!disputes_evaluator_id_fkey(name), agent:users!disputes_agent_id_fkey(name)')
-      // Criticality disputes (a Team Leader challenging a Highly Critical / standalone
-      // marking) follow their own flow in the Coaching Queue and are not agent disputes,
-      // so they stay out of these figures. kind is NULL for agent disputes.
-      .or('kind.is.null,kind.neq.criticality')
-      .order('created_at', { ascending: false }).limit(5000)
-    if (!priv) {
-      if (isTL) {
-        const sc = await getEvaluatorScope(profile.id); const hubIds = sc.hubIds || []
-        if (!hubIds.length) { setRows([]); setLoading(false); return }
-        q = q.in('hub_id', hubIds)
-      } else {
-        q = q.eq('evaluator_id', profile.id)
-      }
-    }
-    const { data } = await q
-    setRows(data || [])
-    setLoading(false)
-  }
-  useEffect(() => { if (profile?.id) load() /* eslint-disable-next-line */ }, [profile?.id])
-
-  const TERMINAL = ['tl_rejected', 'upheld', 'cancelled', 'accepted']
-  const base = useMemo(() => (rows || []).map(r => ({ ...r,
-    _type: r.eval_type === 'dsat' ? 'DSAT' : 'Quality',
-    _date: r.created_at ? String(r.created_at).slice(0, 10) : '',
-    _evaluator: r.evaluator?.name || '—',
-    _agent: r.agent?.name || '—',
-  })), [rows])
-  const flt = base.filter(r =>
-    (!fStatus || r.status === fStatus) && (!fType || r._type === fType) &&
-    (!fFrom || (r._date && r._date >= fFrom)) && (!fTo || (r._date && r._date <= fTo)))
-
-  const total = flt.length
-  const upheld = flt.filter(r => r.outcome === 'upheld').length
-  const rejected = flt.filter(r => r.outcome === 'rejected').length
-  const cancelled = flt.filter(r => r.outcome === 'cancelled').length
-  const pending = flt.filter(r => !TERMINAL.includes(r.status)).length
-  const redisputed = flt.filter(r => (r.re_dispute_count || 0) > 0).length
-  const decided = upheld + rejected
-  const acceptRate = decided ? Math.round((upheld / decided) * 100) : 0
-
-  const byEval = useMemo(() => {
-    const m = {}
-    flt.forEach(r => {
-      const k = r._evaluator
-      m[k] = m[k] || { name: k, total: 0, upheld: 0, rejected: 0, pending: 0 }
-      m[k].total++
-      if (r.outcome === 'upheld') m[k].upheld++
-      if (r.outcome === 'rejected') m[k].rejected++
-      if (!TERMINAL.includes(r.status)) m[k].pending++
-    })
-    return Object.values(m).sort((a, b) => b.total - a.total)
-  }, [flt])
-
-  const sel = { padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }
-  const card = { flex: 1, minWidth: 130, textAlign: 'center', padding: '18px 16px' }
-  const cnum = { fontSize: 26, fontWeight: 700 }
-  const clbl = { fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }
-  const thStyle = { padding: '10px 16px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }
-  const tdStyle = { padding: '10px 16px' }
-
-  const exportCsv = () => {
-    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const headers = ['Evaluation', 'Type', 'Status', 'Outcome', 'Re-disputes', 'Evaluator', 'Agent', 'Raised']
-    const lines = [headers.map(esc).join(',')]
-    flt.forEach(r => lines.push([esc('#' + r.evaluation_id), esc(r._type), esc(DISPUTE_STATUS[r.status]?.label || r.status), esc(r.outcome || 'open'), esc(r.re_dispute_count || 0), esc(r._evaluator), esc(r._agent), esc(r._date)].join(',')))
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-    a.download = `dispute-insights-${new Date().toISOString().split('T')[0]}.csv`; a.click(); URL.revokeObjectURL(a.href)
-  }
-
-  if (loading) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Filter:</span>
-        <select style={sel} value={fStatus} onChange={e => setFStatus(e.target.value)}><option value="">All Statuses</option>{Object.entries(DISPUTE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
-        <select style={sel} value={fType} onChange={e => setFType(e.target.value)}><option value="">All Types</option><option>Quality</option><option>DSAT</option></select>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>from</span>
-        <input type="date" style={sel} value={fFrom} onChange={e => setFrom(e.target.value)} />
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>to</span>
-        <input type="date" style={sel} value={fTo} onChange={e => setTo(e.target.value)} />
-        <button className="btn btn-accent-soft" style={{ marginLeft: 'auto' }} onClick={exportCsv}>⬇ Export to Excel</button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <div className="card" style={card}><div style={cnum}>{total}</div><div style={clbl}>Raised</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: '#22c55e' }}>{upheld}</div><div style={clbl}>Upheld</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: '#ef4444' }}>{rejected}</div><div style={clbl}>Rejected</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: '#f59e0b' }}>{pending}</div><div style={clbl}>Pending</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: '#6366f1' }}>{redisputed}</div><div style={clbl}>Re-disputed</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: '#64748b' }}>{cancelled}</div><div style={clbl}>Cancelled</div></div>
-        <div className="card" style={card}><div style={{ ...cnum, color: acceptRate >= 50 ? '#22c55e' : '#dc2626' }}>{acceptRate}%</div><div style={clbl}>Acceptance rate</div></div>
-      </div>
-
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>By evaluator</div>
-      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 24 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
-            <th style={thStyle}>Evaluator</th><th style={thStyle}>Disputes</th><th style={thStyle}>Upheld</th><th style={thStyle}>Rejected</th><th style={thStyle}>Pending</th><th style={thStyle}>Acceptance</th>
-          </tr></thead>
-          <tbody>
-            {byEval.length === 0 && <tr><td colSpan="6" style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-secondary)' }}>No disputes match the selected filters.</td></tr>}
-            {byEval.map(c => {
-              const dec = c.upheld + c.rejected; const rate = dec ? Math.round((c.upheld / dec) * 100) : 0
-              return (
-                <tr key={c.name} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ ...tdStyle, fontWeight: 500 }}>{c.name}</td>
-                  <td style={tdStyle}>{c.total}</td>
-                  <td style={tdStyle}>{c.upheld}</td>
-                  <td style={tdStyle}>{c.rejected}</td>
-                  <td style={tdStyle}>{c.pending}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: rate >= 50 ? 'var(--success)' : 'var(--danger)' }}>{rate}%</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Disputes</div>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
-            <th style={thStyle}>Eval</th><th style={thStyle}>Type</th><th style={thStyle}>Evaluator</th><th style={thStyle}>Agent</th><th style={thStyle}>Status</th><th style={thStyle}>Raised</th><th style={{ ...thStyle, textAlign: 'right' }} />
-          </tr></thead>
-          <tbody>
-            {flt.length === 0 && <tr><td colSpan="7" style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-secondary)' }}>No disputes.</td></tr>}
-            {flt.map(r => {
-              const st = DISPUTE_STATUS[r.status] || { label: r.status, color: 'var(--text-secondary)' }
-              return (
-                <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>#{r.evaluation_id}</td>
-                  <td style={tdStyle}>{r._type}</td>
-                  <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{r._evaluator}</td>
-                  <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{r._agent}</td>
-                  <td style={tdStyle}><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: st.color + '22', color: st.color }}>{st.label}</span></td>
-                  <td style={{ ...tdStyle, color: 'var(--text-secondary)' }}>{r._date}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }}><button className="btn btn-ghost btn-sm" onClick={() => onOpen(r)}>View</button></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
       </div>
     </div>
   )
@@ -1197,12 +1019,7 @@ export default function Evaluations() {
         </div>
       </div>
 
-      {!isAgent && (
-        <div className="tabs" style={{ marginBottom: 16 }}>
-          <button className={`tab ${view === 'evaluations' ? 'active' : ''}`} onClick={() => setView('evaluations')}>Evaluations</button>
-          <button className={`tab ${view === 'disputes' ? 'active' : ''}`} onClick={() => setView('disputes')}>Dispute Insights</button>
-        </div>
-      )}
+      {/* Dispute Insights moved to its own page (/disputes). */}
       {view === 'evaluations' && (<>
       <div className="filter-bar">
         <select className="select" value={filters.scorecard}
@@ -1397,7 +1214,6 @@ export default function Evaluations() {
       </div>
       </>)}
 
-      {view === 'disputes' && <DisputeInsights profile={profile} onOpen={openDispute} />}
 
       {/* DRAFTS MODAL */}
       {showDrafts && (
