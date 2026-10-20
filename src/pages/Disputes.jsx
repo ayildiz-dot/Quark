@@ -12,9 +12,10 @@ import { DISPUTE_STATUS, DISPUTE_TERMINAL } from '../lib/disputes'
   the viewer's scope. Criticality disputes are left out on purpose: they are a Team Leader
   challenging a critical marking, decided in the Coaching Queue, and are not agent disputes.
 
-  Visibility matches the old Dispute Insights tab: Admins and Owners see everything, Team
-  Leaders see their hubs, Evaluators see disputes on their own evaluations. RLS still has
-  the final say on every query below.
+  Visibility: Admins and Owners see everything; Team Leaders see every dispute on their
+  hubs, spot-check disputes included; Evaluators see disputes on their own evaluations plus
+  spot-check disputes they raised as the BPO QA. Agents have no access to this page. RLS
+  still has the final say on every query below.
 
   "View" reuses the dispute window on the Evaluations page through its ?dispute= deep link,
   so the decision logic exists in exactly one place.
@@ -61,16 +62,25 @@ export default function Disputes() {
 
     let q = supabase.from('disputes')
       .select('*, evaluator:users!disputes_evaluator_id_fkey(name), agent:users!disputes_agent_id_fkey(name, email)')
-      .or('kind.is.null,kind.neq.criticality')
       .order('created_at', { ascending: false }).limit(5000)
-    if (!priv) {
-      if (isTL) {
-        const sc = await getEvaluatorScope(profile.id); const hubIds = sc.hubIds || []
-        if (!hubIds.length) { setRows([]); setLoading(false); return }
-        q = q.in('hub_id', hubIds)
-      } else {
-        q = q.eq('evaluator_id', profile.id)
-      }
+    if (priv) {
+      q = q.or('kind.is.null,kind.neq.criticality')
+    } else if (isTL) {
+      const sc = await getEvaluatorScope(profile.id); const hubIds = sc.hubIds || []
+      if (!hubIds.length) { setRows([]); setLoading(false); return }
+      q = q.in('hub_id', hubIds).or('kind.is.null,kind.neq.criticality')
+    } else {
+      // Evaluators: disputes on evaluations they did (agent disputes, and spot-check
+      // disputes where they are the KG QA), PLUS spot-check disputes they raised
+      // themselves as the BPO QA. In a spot-check dispute the raiser is stored in
+      // agent_id, which is why the second branch matches on agent_id.
+      // Written as one or() so criticality disputes stay excluded in every branch.
+      const me = profile.id
+      q = q.or(
+        `and(evaluator_id.eq.${me},kind.is.null),` +
+        `and(evaluator_id.eq.${me},kind.eq.dsat_spotcheck),` +
+        `and(agent_id.eq.${me},kind.eq.dsat_spotcheck)`
+      )
     }
     const { data: disputes, error } = await q
     if (error) console.error('Disputes load:', error.message)
